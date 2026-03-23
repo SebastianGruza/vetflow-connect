@@ -148,24 +148,38 @@ def _parse_obx(fields: list[str]) -> HL7Result | None:
     sequence = _get_field(fields, 1)
     value_type = _get_field(fields, 2)
 
-    # Capture image (ED) segments — log full content for analysis
+    # Capture image (ED) segments — decode base64 JPEG and save
     if value_type == "ED":
         raw_data = _get_field(fields, 5)
-        data_preview = raw_data[:200] if raw_data else "(empty)"
         logger.info(
-            "📸 IMAGE OBX detected! seq=%s, data_length=%d, preview=%s",
-            sequence, len(raw_data) if raw_data else 0, data_preview,
+            "📸 IMAGE OBX detected! seq=%s, data_length=%d",
+            sequence, len(raw_data) if raw_data else 0,
         )
-        # Save raw ED segment to file for analysis
         try:
-            import os
+            import os, base64
             img_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "captured_images")
             os.makedirs(img_dir, exist_ok=True)
-            with open(os.path.join(img_dir, f"ed_segment_{sequence}.txt"), "w") as f:
-                f.write("|".join(fields))
-            logger.info("📸 Raw ED segment saved to captured_images/ed_segment_%s.txt", sequence)
+
+            # Format: "Base64^/9j/4AAQ..." — split on ^ to get actual base64 data
+            if raw_data and "^" in raw_data:
+                b64_data = raw_data.split("^", 1)[1]
+                jpeg_bytes = base64.b64decode(b64_data)
+                
+                # Get image type from OBX.3 (e.g. RBC_Histo, WBC_Distribution, LYM_Main, Part1)
+                param_parts = _split_field(_get_field(fields, 3))
+                img_type = param_parts[0] if param_parts else f"img_{sequence}"
+                
+                jpg_path = os.path.join(img_dir, f"{img_type}_seq{sequence}.jpg")
+                with open(jpg_path, "wb") as f:
+                    f.write(jpeg_bytes)
+                logger.info("📸 Saved %s (%d bytes JPEG)", jpg_path, len(jpeg_bytes))
+            else:
+                # Fallback: save raw text
+                with open(os.path.join(img_dir, f"ed_segment_{sequence}.txt"), "w") as f:
+                    f.write("|".join(fields))
+                logger.info("📸 Raw ED segment saved (no Base64^ prefix)")
         except Exception as e:
-            logger.warning("Could not save ED segment: %s", e)
+            logger.warning("Could not decode/save ED segment %s: %s", sequence, e)
         return None
 
     # Skip diagnostic text for now

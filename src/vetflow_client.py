@@ -17,6 +17,37 @@ class VetFlowClient:
         self.url = vetflow_url.rstrip("/")
         self.api_key = api_key
 
+    async def check_connection(self) -> bool:
+        """Verify API key is valid and VetFlow is reachable.
+
+        Returns:
+            True if API key is accepted, False otherwise.
+        """
+        endpoint = f"{self.url}/api/clinic/lab-results/import-json-external"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Send empty ping — server will reject with 422 (validation error)
+                # but that means auth passed. 401 = bad key, connection error = unreachable.
+                async with session.post(
+                    endpoint,
+                    json={},
+                    headers={"X-Clinic-API-Key": self.api_key},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status == 401:
+                        logger.error("❌ API key rejected — check your api_key in config.json")
+                        return False
+                    elif resp.status in (200, 422):
+                        logger.info("✅ API connection OK — VetFlow is reachable, key is valid")
+                        return True
+                    else:
+                        logger.warning("⚠️ Unexpected response %d — VetFlow reachable but check config", resp.status)
+                        return True  # reachable at least
+        except aiohttp.ClientError as exc:
+            logger.error("❌ Cannot reach VetFlow at %s: %s", self.url, exc)
+            return False
+
     async def send_result(self, xml_content: str, filename: str = "hl7_result.xml") -> bool:
         """Upload XML lab result to VetFlow.
 

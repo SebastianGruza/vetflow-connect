@@ -115,6 +115,12 @@ async def run_agent(config: Config) -> None:
 
     client = VetFlowClient(config.vetflow_url, config.api_key)
 
+    # Check API connection
+    api_ok = await client.check_connection()
+    if not api_ok:
+        logger.warning("⚠️ VetFlow API check failed — results will be parsed but NOT uploaded")
+        logger.warning("⚠️ Check vetflow_url and api_key in config.json")
+
     # Auto-discover devices if configured
     device_hosts: dict[int, str] = {}
     if config.auto_discover:

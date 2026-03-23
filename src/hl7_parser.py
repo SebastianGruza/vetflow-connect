@@ -148,9 +148,29 @@ def _parse_obx(fields: list[str]) -> HL7Result | None:
     sequence = _get_field(fields, 1)
     value_type = _get_field(fields, 2)
 
-    # Skip image (ED) and diagnostic text (TX) types for now
-    if value_type in ("ED", "TX"):
-        logger.debug("Skipping OBX type %s (seq %s)", value_type, sequence)
+    # Capture image (ED) segments — log full content for analysis
+    if value_type == "ED":
+        raw_data = _get_field(fields, 5)
+        data_preview = raw_data[:200] if raw_data else "(empty)"
+        logger.info(
+            "📸 IMAGE OBX detected! seq=%s, data_length=%d, preview=%s",
+            sequence, len(raw_data) if raw_data else 0, data_preview,
+        )
+        # Save raw ED segment to file for analysis
+        try:
+            import os
+            img_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "captured_images")
+            os.makedirs(img_dir, exist_ok=True)
+            with open(os.path.join(img_dir, f"ed_segment_{sequence}.txt"), "w") as f:
+                f.write("|".join(fields))
+            logger.info("📸 Raw ED segment saved to captured_images/ed_segment_%s.txt", sequence)
+        except Exception as e:
+            logger.warning("Could not save ED segment: %s", e)
+        return None
+
+    # Skip diagnostic text for now
+    if value_type == "TX":
+        logger.debug("Skipping OBX type TX (seq %s)", sequence)
         return None
 
     param_parts = _split_field(_get_field(fields, 3))

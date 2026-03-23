@@ -64,6 +64,19 @@ def _make_callback(client: VetFlowClient, device_name: str):
     """Create message handler callback for a specific device."""
 
     async def on_message(raw_message: str) -> None:
+        # Save raw HL7 for debugging/analysis
+        try:
+            import os
+            raw_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "captured_raw")
+            os.makedirs(raw_dir, exist_ok=True)
+            from datetime import datetime as dt
+            fname = f"hl7_{device_name}_{dt.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            with open(os.path.join(raw_dir, fname), "w", encoding="utf-8") as f:
+                f.write(raw_message)
+            logger.info("Raw HL7 saved to captured_raw/%s (%d bytes)", fname, len(raw_message))
+        except Exception:
+            pass
+
         # Parse HL7
         parsed: HL7Message = parse_hl7(raw_message)
 

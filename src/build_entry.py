@@ -17,6 +17,9 @@ import hl7_listener  # noqa: F401
 import vetflow_client  # noqa: F401
 import xml_builder  # noqa: F401
 import auto_discover  # noqa: F401
+import tray  # noqa: F401
+import pystray  # noqa: F401
+import PIL  # noqa: F401
 
 from agent import main
 main()

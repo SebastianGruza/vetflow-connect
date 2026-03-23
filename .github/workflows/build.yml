@@ -1,57 +1,35 @@
-name: Build & Release VetFlowConnect
+name: Build VetFlowConnect.exe
 
 on:
   push:
-    tags:
-      - 'v*'
+    paths:
+      - 'scripts/vetflow_connect/**'
   workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-permissions:
-  contents: write
-
 jobs:
-  build-windows:
+  build-windows-exe:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
-
+      
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
+      
       - name: Install dependencies
-        run: pip install pyinstaller aiohttp
-
+        run: pip install pyinstaller aiohttp pystray Pillow
+      
       - name: Build EXE
         shell: bash
         run: |
-          cd src
-          pyinstaller --onefile --name VetFlowConnect --icon ../icon.ico --add-data "../config.json.example;." --paths . build_entry.py
-
-      - name: Generate SHA256
-        shell: bash
-        run: |
-          cd src/dist
-          sha256sum VetFlowConnect.exe > VetFlowConnect.exe.sha256
-          cat VetFlowConnect.exe.sha256
-
+          cd scripts/vetflow_connect
+          pyinstaller --onefile --name VetFlowConnect --icon icon.ico --add-data "config.json.example;." --hidden-import pystray._win32 --hidden-import PIL --paths . --noconsole build_entry.py
+      
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: VetFlowConnect-Windows
-          path: |
-            src/dist/VetFlowConnect.exe
-            src/dist/VetFlowConnect.exe.sha256
-
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            src/dist/VetFlowConnect.exe
-            src/dist/VetFlowConnect.exe.sha256
-            config.json.example
-          generate_release_notes: true
+          path: scripts/vetflow_connect/dist/VetFlowConnect.exe

@@ -89,8 +89,7 @@ def _make_callback(client: VetFlowClient, device_name: str):
             r.name: {
                 "value": r.value,
                 "unit": r.unit,
-                "ref_low": r.ref_low,
-                "ref_high": r.ref_high,
+                "reference_range": r.reference_range,
                 "flag": r.flag,
             }
             for r in parsed.results

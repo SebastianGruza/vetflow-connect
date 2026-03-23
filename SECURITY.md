@@ -19,7 +19,7 @@ VetFlowConnect is a local HL7 agent that:
 
 If you find a security vulnerability, please report it responsibly:
 
-1. **Email:** security@vet-flow.pl
+1. **Email:** sebastian@gruzalab.pl
 2. **Do NOT** open a public GitHub issue for security vulnerabilities
 
 We will respond within 48 hours and work with you to resolve the issue.

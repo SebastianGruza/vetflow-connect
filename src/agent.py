@@ -97,7 +97,7 @@ def _make_callback(client: VetFlowClient, device_name: str):
 
         json_payload = {
             "lab_name": parsed.device or device_name,
-            "test_date": parsed.timestamp.isoformat() if parsed.timestamp else None,
+            "test_date": str(parsed.timestamp) if parsed.timestamp else None,
             "patient_name": parsed.patient.name if parsed.patient else None,
             "sample_type": parsed.panel_name or "CBC",
             "order_number": parsed.message_id,

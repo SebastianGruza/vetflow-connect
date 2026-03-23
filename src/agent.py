@@ -69,12 +69,29 @@ def _make_callback(client: VetFlowClient, device_name: str):
             logger.warning("[%s] No results in message, skipping", device_name)
             return
 
-        # Convert to VetFlow XML
-        xml_content = hl7_to_vetflow_xml(parsed)
-        filename = f"{parsed.device}_{parsed.message_id or 'unknown'}.xml"
+        # Build JSON payload for VetFlow API
+        results_dict = {
+            r.name: {
+                "value": r.value,
+                "unit": r.unit,
+                "ref_low": r.ref_low,
+                "ref_high": r.ref_high,
+                "flag": r.flag,
+            }
+            for r in parsed.results
+        }
+
+        json_payload = {
+            "lab_name": parsed.device or device_name,
+            "test_date": parsed.timestamp.isoformat() if parsed.timestamp else None,
+            "patient_name": parsed.patient.name if parsed.patient else None,
+            "sample_type": parsed.panel_name or "CBC",
+            "order_number": parsed.message_id,
+            "results_json": results_dict,
+        }
 
         # Send to VetFlow
-        success = await client.send_result(xml_content, filename)
+        success = await client.send_result_json(json_payload)
 
         status = "OK" if success else "FAIL"
         logger.info(

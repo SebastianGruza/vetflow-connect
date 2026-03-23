@@ -48,6 +48,37 @@ class VetFlowClient:
             logger.error("❌ Cannot reach VetFlow at %s: %s", self.url, exc)
             return False
 
+    async def send_result_json(self, parsed_data: dict) -> bool:
+        """Send parsed HL7 result as JSON to VetFlow API (new endpoint).
+
+        Args:
+            parsed_data: Dict with keys matching LabResultJsonImport schema.
+
+        Returns:
+            True if import succeeded, False otherwise.
+        """
+        endpoint = f"{self.url}/api/clinic/lab-results/import-json-external"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    endpoint,
+                    json=parsed_data,
+                    headers={"X-Clinic-API-Key": self.api_key},
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as resp:
+                    if resp.status in (200, 201):
+                        body = await resp.json()
+                        logger.info("Imported to VetFlow: %s", body)
+                        return True
+                    else:
+                        text = await resp.text()
+                        logger.error("VetFlow API error %d: %s", resp.status, text[:500])
+                        return False
+        except aiohttp.ClientError as exc:
+            logger.error("VetFlow connection error: %s", exc)
+            return False
+
     async def send_result(self, xml_content: str, filename: str = "hl7_result.xml") -> bool:
         """Upload XML lab result to VetFlow.
 

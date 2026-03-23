@@ -156,8 +156,13 @@ def _parse_obx(fields: list[str]) -> HL7Result | None:
             sequence, len(raw_data) if raw_data else 0,
         )
         try:
-            import os, base64
-            img_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "captured_images")
+            import os, sys, base64
+            # Save next to .exe (not in PyInstaller temp dir)
+            if getattr(sys, 'frozen', False):
+                base_dir = os.path.dirname(sys.executable)
+            else:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+            img_dir = os.path.join(base_dir, "captured_images")
             os.makedirs(img_dir, exist_ok=True)
 
             # Format: "Base64^/9j/4AAQ..." — split on ^ to get actual base64 data

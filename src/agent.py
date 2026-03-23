@@ -66,8 +66,12 @@ def _make_callback(client: VetFlowClient, device_name: str):
     async def on_message(raw_message: str) -> None:
         # Save raw HL7 for debugging/analysis
         try:
-            import os
-            raw_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "captured_raw")
+            import os, sys as _sys
+            if getattr(_sys, 'frozen', False):
+                base_dir = os.path.dirname(_sys.executable)
+            else:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+            raw_dir = os.path.join(base_dir, "captured_raw")
             os.makedirs(raw_dir, exist_ok=True)
             from datetime import datetime as dt
             fname = f"hl7_{device_name}_{dt.now().strftime('%Y%m%d_%H%M%S')}.txt"

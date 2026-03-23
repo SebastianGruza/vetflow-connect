@@ -11,6 +11,8 @@ Usage:
 
 from __future__ import annotations
 
+VERSION = "0.2.0"
+
 import argparse
 import asyncio
 import logging
@@ -125,7 +127,7 @@ async def run_agent(config: Config) -> None:
     setup_logging(config)
 
     logger.info("=" * 60)
-    logger.info("VetFlowConnect Agent starting")
+    logger.info("VetFlowConnect Agent v%s", VERSION)
     logger.info("VetFlow URL: %s", config.vetflow_url)
     logger.info("Devices: %s", ", ".join(d.name for d in config.devices))
     logger.info("=" * 60)

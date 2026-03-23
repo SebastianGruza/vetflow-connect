@@ -109,9 +109,9 @@ def _make_callback(client: VetFlowClient, device_name: str):
         }
 
         # Send to VetFlow
-        success = await client.send_result_json(json_payload)
+        lab_result_id = await client.send_result_json(json_payload)
 
-        status = "OK" if success else "FAIL"
+        status = "OK" if lab_result_id else "FAIL"
         logger.info(
             "[%s] %s | %s | %s | %d params → VetFlow %s",
             device_name,
@@ -121,6 +121,20 @@ def _make_callback(client: VetFlowClient, device_name: str):
             len(parsed.results),
             status,
         )
+
+        # Upload captured images if import succeeded
+        if lab_result_id:
+            try:
+                from pathlib import Path
+                img_dir = Path(base_dir) / "captured_images"
+                if img_dir.exists():
+                    jpg_files = sorted(img_dir.glob("*.jpg"))
+                    if jpg_files:
+                        logger.info("[%s] Uploading %d images for lab_result_id=%d", device_name, len(jpg_files), lab_result_id)
+                        ok = await client.send_images(lab_result_id, jpg_files)
+                        logger.info("[%s] Image upload %s", device_name, "OK" if ok else "FAIL")
+            except Exception as e:
+                logger.warning("[%s] Image upload error: %s", device_name, e)
 
     return on_message
 

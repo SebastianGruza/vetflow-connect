@@ -1,152 +1,143 @@
-# 🐾 VetFlowConnect
+# VetFlowConnect
 
-**Open-source HL7 agent for veterinary laboratory analyzers.**
+Open-source desktop connector for VetFlow device integrations.
 
-VetFlowConnect is a lightweight Windows agent that listens for HL7 messages from veterinary blood analyzers (Skyla VM100, Tutti, and others) and automatically sends parsed results to [VetFlow](https://vet-flow.pl) — a cloud veterinary clinic management system.
+VetFlowConnect now uses a plugin architecture. The local app stores only an API key and the VetFlow URL; device definitions, ports, hosts, and feature flags come from VetFlow over `/api/device/config`.
 
-## Why Open Source?
+## Architecture
 
-Veterinary clinics handle sensitive patient data. We believe the software running on clinic computers should be fully transparent and auditable. That's why VetFlowConnect is open source — you can inspect every line of code, build it yourself, and verify that the .exe does exactly what it claims.
+```text
+src/
+├── core/
+│   ├── app.py
+│   ├── api_client.py
+│   ├── auto_discover.py
+│   ├── config.py
+│   ├── plugin_base.py
+│   ├── plugin_loader.py
+│   └── tray.py
+├── plugins/
+│   └── skyla/
+│       ├── plugin.py
+│       ├── hl7_listener.py
+│       ├── hl7_parser.py
+│       └── README.md
+└── setup_wizard.py
+```
 
-## Features
+Key points:
 
-- 🔍 **Auto-discovery** — scans local network for HL7 devices
-- 🩸 **HL7 v2.x parser** — CBC (Complete Blood Count) and Chemistry panels
-- 📡 **Real-time listening** — TCP server on configurable ports
-- 🌐 **VetFlow API integration** — automatic upload of parsed results
-- 🪟 **Windows .exe** — single-file executable, no installation needed
-- 📋 **Logging** — full debug logs to file
+- `core/plugin_base.py` defines the `DevicePlugin` contract and shared payload dataclasses.
+- `core/plugin_loader.py` scans `plugins/` and loads plugin classes dynamically.
+- `core/app.py` validates the API key, fetches remote config, starts plugins, and sends heartbeats.
+- `setup_wizard.py` handles first-run configuration with a simple Tkinter form.
+- `plugins/skyla/` is the first migrated plugin and preserves the current HL7 parsing/listener behavior.
 
-## Supported Analyzers
+## First Run
 
-| Analyzer | Protocol | Type | Status |
-|----------|----------|------|--------|
-| Skyla VM100 | HL7 v2.3.1 | CBC (morphology) | ✅ Tested |
-| Skyla Tutti | HL7 v2.8 | Chemistry (biochemistry) | 🔄 In progress |
+If `config.json` is missing, VetFlowConnect opens a setup wizard with:
 
-## Quick Start
+- API key input
+- Server choice:
+  - `vet-flow.pl`
+  - `test.vet-flow.pl`
+  - `vetflow.gruzalab.pl`
+  - custom URL
+- `Connect & Save` button
+- status label
 
-### Download
+The wizard:
 
-Download the latest `VetFlowConnect.exe` from [GitHub Releases](https://github.com/SebastianGruza/vetflow-connect/releases).
+1. Calls `POST /api/device/register`
+2. Calls `GET /api/device/config`
+3. Saves the local config only after both requests succeed
 
-### Configure
-
-Create a `config.json` file in the same folder as the .exe:
+Local config is intentionally minimal:
 
 ```json
 {
-  "vetflow_url": "https://vet-flow.pl",
-  "api_key": "your_clinic_api_key",
-  "devices": [
-    {"name": "VM100", "host": "auto", "port": 8888, "type": "cbc"},
-    {"name": "Tutti", "host": "auto", "port": 8889, "type": "chemistry"}
-  ],
-  "auto_discover": true,
+  "api_key": "clinic_api_key_here",
+  "url": "https://vet-flow.pl",
   "log_file": "vetflow_connect.log"
 }
 ```
 
-- `vetflow_url` — your VetFlow instance URL
-- `api_key` — clinic API key (generate in VetFlow → Settings → Integrations)
-- `devices` — list of analyzers (`host: "auto"` enables network discovery)
-- `auto_discover` — scan local network for HL7 devices on startup
+## Runtime Flow
 
-### Run
+1. VetFlowConnect loads local config or launches the setup wizard.
+2. It verifies the API key with VetFlow.
+3. It downloads the clinic device configuration.
+4. It loads enabled plugins from `plugins/`.
+5. Each plugin starts with its server-provided device config.
+6. The tray icon shows connection state and active plugin health.
+7. The app sends heartbeats to VetFlow.
 
-Double-click `VetFlowConnect.exe`. The agent will:
+## Tray
 
-1. Scan the local network for HL7 devices
-2. Start listening on configured ports
-3. Parse incoming HL7 messages
-4. Send results to VetFlow API
+The tray app now includes:
 
-### Network Setup
+- connected clinic status
+- active plugin status lines
+- `Ustawienia` shortcut to VetFlow device settings in the browser
+- `Wyloguj` to remove `config.json` and return to the setup wizard
+- `Pokaż logi`
+- `Zamknij`
 
-```
-┌──────────┐     HL7/TCP      ┌─────────────────┐    HTTPS     ┌──────────┐
-│ Skyla    │ ───────────────→ │ VetFlowConnect  │ ──────────→ │ VetFlow  │
-│ VM100    │    port 8888     │ (Windows PC)    │   API POST   │ (cloud)  │
-└──────────┘                  └─────────────────┘              └──────────┘
-```
+## Supported Plugins
 
-Both the analyzer and the PC must be on the same local network (LAN).
+| Plugin | Protocol | Type | Status |
+| --- | --- | --- | --- |
+| `skyla` | HL7 / MLLP | lab_analyzer | bundled |
 
-## Build from Source
+## Creating a New Plugin
 
-### Requirements
+Use `plugins/skyla/` as the template.
+
+1. Copy `plugins/skyla/` to a new directory.
+2. Update `plugin.py`:
+   - set `name`
+   - set `display_name`
+   - set `protocol`
+   - set `device_type`
+   - implement `start()`, `stop()`, `health_check()`
+3. Emit data with `self.on_lab_result(...)` or `self.on_vitals(...)`.
+4. Test with `python -m src --plugin your-plugin-name`.
+
+## Development
+
+Requirements:
 
 - Python 3.12+
-- `aiohttp` (HTTP client)
-- `pyinstaller` (for .exe build)
+- `aiohttp`
+- `pystray`
+- `Pillow`
 
-### Install dependencies
-
-```bash
-pip install aiohttp pyinstaller
-```
-
-### Run in development
+Run locally:
 
 ```bash
-cd src
-python -m __main__
-# or
-python build_entry.py
+python -m src
 ```
 
-### Build .exe
+Build the Windows executable:
 
 ```bash
 cd src
 pyinstaller --onefile --name VetFlowConnect --icon ../icon.ico --add-data "../config.json.example;." --paths . build_entry.py
 ```
 
-The .exe will be in `src/dist/VetFlowConnect.exe`.
-
-### Verify the build
-
-Every official release includes a SHA256 hash. To verify:
-
-```powershell
-# Windows PowerShell
-Get-FileHash VetFlowConnect.exe -Algorithm SHA256
-```
-
-Compare the hash with the one published in the GitHub Release.
-
-## Running Tests
+Run tests:
 
 ```bash
-cd tests
-python -m pytest test_hl7_parser.py test_mllp.py test_xml_builder.py
+python -m pytest tests
 ```
-
-## Contributing
-
-Contributions welcome! Especially:
-
-- 🔬 **New analyzer support** — add HL7 parsers for other vet analyzers
-- 🐛 **Bug reports** — file issues with HL7 message samples (anonymized!)
-- 📖 **Documentation** — setup guides for specific analyzers
-- 🌍 **Translations** — UI messages in other languages
 
 ## Security
 
-- VetFlowConnect only **listens** for HL7 on local network and **sends** to configured VetFlow URL
-- No data is stored permanently (only log file)
-- API key is stored in local `config.json` — protect this file
-- All communication with VetFlow is over HTTPS
-- The agent has **no remote access** capabilities — it cannot be controlled from outside
+- Local configuration stores only the API key, VetFlow URL, and log file path.
+- Device topology is managed centrally in VetFlow.
+- VetFlowConnect listens locally and sends data outbound to VetFlow only.
+- HTTPS should be used for every production VetFlow URL.
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
-
-## About VetFlow
-
-[VetFlow](https://vet-flow.pl) is a modern cloud veterinary clinic management system built in Poland. Features include appointment scheduling, medical records, inventory management, online booking, and laboratory integrations.
-
----
-
-Made with 🐾 by the VetFlow team
+MIT. See `LICENSE`.

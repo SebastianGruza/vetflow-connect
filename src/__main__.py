@@ -1,8 +1,8 @@
-"""Allow running as: python -m scripts.vetflow_connect"""
+"""Allow running as `python -m src`."""
 
 try:
-    from .agent import main
+    from .core.app import main
 except ImportError:
-    from agent import main
+    from core.app import main
 
 main()

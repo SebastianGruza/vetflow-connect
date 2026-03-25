@@ -1,10 +1,5 @@
 {
-  "vetflow_url": "https://vet-flow.pl",
   "api_key": "clinic_api_key_here",
-  "devices": [
-    {"name": "VM100", "host": "auto", "port": 8888, "type": "cbc"},
-    {"name": "Tutti", "host": "auto", "port": 8889, "type": "chemistry"}
-  ],
-  "auto_discover": true,
+  "url": "https://vet-flow.pl",
   "log_file": "vetflow_connect.log"
 }

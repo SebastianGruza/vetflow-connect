@@ -20,6 +20,7 @@ from .config import (
     clear_config,
     load_config,
 )
+from .plugin_manifest import PluginStatus
 from .plugin_loader import PluginLoader
 from .tray import TrayApp
 
@@ -66,10 +67,11 @@ class RuntimeController:
         self.config_path = config_path
         self.plugin_filter = plugin_filter
         self.client = VetFlowClient(config.url, config.api_key)
-        self.loader = PluginLoader()
+        self.loader = PluginLoader(server_url=config.url)
         self.clinic_info: dict = {}
         self.remote_config: dict = {}
         self.plugins: list[tuple[dict, object]] = []
+        self.blocked_plugins: list[dict] = []
         self.exit_mode = "quit"
         self._loop: asyncio.AbstractEventLoop | None = None
         self._stop_event: asyncio.Event | None = None
@@ -143,6 +145,7 @@ class RuntimeController:
 
     async def _start_plugins(self) -> None:
         available_plugins = self.loader.discover()
+        self.blocked_plugins = self.loader.blocked_plugin_statuses()
         remote_devices = [
             device
             for device in self.remote_config.get("devices", [])
@@ -182,17 +185,20 @@ class RuntimeController:
         self.plugins.clear()
 
     async def _plugin_statuses(self) -> list[dict]:
-        statuses = []
+        statuses = list(self.blocked_plugins)
         for device, plugin in self.plugins:
             try:
                 healthy = await plugin.health_check()
             except Exception:
                 healthy = False
+            verification = self.loader.verification_for(plugin.name)
             statuses.append(
                 {
                     "name": plugin.name,
                     "display_name": device.get("name", plugin.display_name),
                     "healthy": healthy,
+                    "license_status": verification.status.value,
+                    "status_text": self._plugin_status_text(device, plugin, verification.status),
                 }
             )
         return statuses
@@ -215,6 +221,21 @@ class RuntimeController:
 
     async def _handle_lab_result(self, _data) -> None:
         """Reserved for cross-plugin hooks."""
+
+    def _plugin_status_text(self, device: dict, plugin, status: PluginStatus) -> str:
+        display_name = device.get("name", plugin.display_name)
+        if status == PluginStatus.EXPIRED:
+            verification = self.loader.verification_for(plugin.name)
+            expires_at = verification.manifest.expires_at.strftime("%d.%m.%Y") if verification.manifest and verification.manifest.expires_at else "?"
+            return f"Plugin {display_name}: licencja wygasla {expires_at}"
+        if status == PluginStatus.DEV_MODE:
+            return f"Plugin {display_name}: aktywny (dev mode)"
+        if status == PluginStatus.OK:
+            verification = self.loader.verification_for(plugin.name)
+            if verification.manifest and verification.manifest.license_type == "open":
+                return f"Plugin {display_name}: aktywny (licencja: bezterminowa)"
+            return f"Plugin {display_name}: aktywny"
+        return f"Plugin {display_name}: status {status.value}"
 
 
 def _ensure_stdout() -> None:

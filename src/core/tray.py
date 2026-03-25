@@ -81,7 +81,7 @@ class TrayApp:
             items.append(pystray.Menu.SEPARATOR)
             items.append(pystray.MenuItem("Pluginy", None, enabled=False))
             for plugin in self._plugin_statuses:
-                label = f"{plugin['display_name']}: {'OK' if plugin['healthy'] else 'BŁĄD'}"
+                label = plugin.get("status_text") or f"{plugin['display_name']}: {'OK' if plugin['healthy'] else 'BLAD'}"
                 items.append(pystray.MenuItem(label, None, enabled=False))
 
         items.extend(

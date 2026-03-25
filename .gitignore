@@ -10,3 +10,5 @@ build/
 config.json
 .venv/
 venv/
+scripts/vetflow_private.pem
+scripts/vetflow_public.pem

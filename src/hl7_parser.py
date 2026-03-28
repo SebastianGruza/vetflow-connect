@@ -195,6 +195,9 @@ def _parse_obx(fields: list[str]) -> HL7Result | None:
     param_parts = _split_field(_get_field(fields, 3))
     abbreviation = param_parts[0] if param_parts else ""
     name = param_parts[1] if len(param_parts) > 1 else abbreviation
+    # Tutti/some devices send empty OBX.3 — fallback to sequence number as key
+    if not name:
+        name = f"param_{sequence}"
 
     value = _get_field(fields, 5)
     unit = _get_field(fields, 6)

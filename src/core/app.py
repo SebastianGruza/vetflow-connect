@@ -257,6 +257,17 @@ def _load_or_setup_config(config_path: Path | None) -> Config | None:
         result = run_setup_wizard(config_path=config_path)
         if not result.saved or result.config is None:
             return None
+
+        # On Windows, Tkinter's mainloop leaves the GUI subsystem in a state
+        # where pystray cannot create a tray icon in the same process.
+        # Restart the process so the tray icon initialises cleanly.
+        if sys.platform == "win32":
+            import subprocess
+
+            args = [sys.executable] + sys.argv
+            subprocess.Popen(args)  # noqa: S603
+            sys.exit(0)
+
         return result.config
 
 
